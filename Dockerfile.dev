@@ -1,0 +1,22 @@
+# Development Dockerfile
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install tools dasar
+RUN apk add --no-cache libc6-compat openssl
+
+# Copy package.json dan install dependency
+COPY package*.json ./
+RUN npm install
+
+# Copy semua file proyek
+COPY . .
+
+# Prisma client untuk runtime
+RUN npx prisma generate
+
+EXPOSE 3000
+
+# Default command (Next.js dev mode)
+CMD ["npm", "run", "dev"]
