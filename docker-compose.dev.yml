@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres_booking
+    restart: always
+    environment:
+      POSTGRES_USER: booking_user
+      POSTGRES_PASSWORD: booking_pass
+      POSTGRES_DB: booking_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U booking_user -d booking_db"]
+      interval: 5s
+      retries: 5
+
+  nextjs:
+    container_name: nextjs_booking
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: sh -c "npx prisma migrate dev --name init --skip-seed && npx prisma generate && npm run dev"
+
+volumes:
+  postgres_data:
