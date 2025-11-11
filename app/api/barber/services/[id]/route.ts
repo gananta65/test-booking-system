@@ -61,23 +61,17 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const barber = await prisma.barber.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    if (!barber) {
-      return NextResponse.json(
-        { error: "Barber profile not found" },
-        { status: 404 }
-      );
-    }
-
     const service = await prisma.service.findUnique({
       where: { id: params.id },
+      include: { branch: true },
     });
 
-    if (!service || service.barberId !== barber.id) {
+    if (!service) {
       return NextResponse.json({ error: "Service not found" }, { status: 404 });
+    }
+
+    if (service.branch.userId !== session.user.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     await prisma.service.delete({

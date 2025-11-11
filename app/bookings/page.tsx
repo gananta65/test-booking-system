@@ -17,7 +17,7 @@ interface Booking {
   endTime: string;
   status: string;
   totalPrice: number;
-  barber: { user: { name: string } };
+  barber?: { user: { name: string } } | null;
   service: { name: string };
   notes?: string;
 }
@@ -28,6 +28,7 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("upcoming");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -43,13 +44,17 @@ export default function BookingsPage() {
 
   async function fetchBookings() {
     try {
+      setError("");
       const res = await fetch("/api/bookings");
       if (res.ok) {
         const data = await res.json();
         setBookings(data);
+      } else {
+        setError("Failed to load bookings");
       }
     } catch (error) {
       console.error("Failed to fetch bookings:", error);
+      setError("Failed to load bookings");
     } finally {
       setLoading(false);
     }
@@ -116,6 +121,12 @@ export default function BookingsPage() {
             </div>
           </div>
 
+          {error && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+              {error}
+            </div>
+          )}
+
           {displayBookings.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
@@ -123,7 +134,7 @@ export default function BookingsPage() {
                   No {activeTab} bookings found
                 </p>
                 <Button asChild>
-                  <Link href="/barbers">Browse Barbers</Link>
+                  <Link href="/booking">Browse Branches</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -133,12 +144,16 @@ export default function BookingsPage() {
                 <Card key={booking.id}>
                   <CardContent className="pt-6">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Barber</p>
-                        <p className="font-medium">
-                          {booking.barber.user.name}
-                        </p>
-                      </div>
+                      {booking.barber && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Barber
+                          </p>
+                          <p className="font-medium">
+                            {booking.barber.user?.name || "Unknown"}
+                          </p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm text-muted-foreground">Service</p>
                         <p className="font-medium">{booking.service.name}</p>

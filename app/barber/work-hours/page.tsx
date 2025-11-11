@@ -18,6 +18,14 @@ interface WorkHour {
   startTime: string;
   endTime: string;
   active: boolean;
+  branchId: string;
+}
+
+interface Branch {
+  id: string;
+  name: string;
+  city?: string;
+  address?: string;
 }
 
 const DAYS = [
@@ -34,9 +42,11 @@ export default function WorkHoursPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [workHours, setWorkHours] = useState<WorkHour[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedDay, setSelectedDay] = useState(1);
   const [formData, setFormData] = useState({
     startTime: "09:00",
@@ -51,14 +61,49 @@ export default function WorkHoursPage() {
 
   useEffect(() => {
     if (session?.user?.id) {
-      fetchWorkHours();
+      fetchBranches();
     }
   }, [session]);
 
-  async function fetchWorkHours() {
+  useEffect(() => {
+    if (selectedBranchId) {
+      fetchWorkHours();
+    } else {
+      setWorkHours([]);
+    }
+  }, [selectedBranchId]);
+
+  async function fetchBranches() {
     try {
       setError(null);
-      const res = await fetch("/api/barber/work-hours");
+      const res = await fetch("/api/barber/branches");
+      if (!res.ok) {
+        throw new Error("Failed to fetch branches");
+      }
+      const data = await res.json();
+      setBranches(data);
+      if (data.length > 0) {
+        setSelectedBranchId(data[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to fetch branches:", err);
+      setError("Failed to load branches");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchWorkHours() {
+    if (!selectedBranchId) {
+      setWorkHours([]);
+      return;
+    }
+
+    try {
+      setError(null);
+      const res = await fetch(
+        `/api/barber/work-hours?branchId=${selectedBranchId}`
+      );
       if (!res.ok) {
         throw new Error("Failed to fetch work hours");
       }
@@ -67,8 +112,6 @@ export default function WorkHoursPage() {
     } catch (err) {
       console.error("Failed to fetch work hours:", err);
       setError("Failed to load work hours");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -76,6 +119,9 @@ export default function WorkHoursPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      if (!selectedBranchId) {
+        throw new Error("Please select a branch");
+      }
       if (formData.startTime >= formData.endTime) {
         throw new Error("Start time must be before end time");
       }
@@ -86,12 +132,14 @@ export default function WorkHoursPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           dayOfWeek: selectedDay,
+          branchId: selectedBranchId,
           ...formData,
         }),
       });
 
       if (!res.ok) {
-        throw new Error("Failed to save work hours");
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to save work hours");
       }
 
       const newWorkHour = await res.json();
@@ -116,6 +164,40 @@ export default function WorkHoursPage() {
           <p className="text-muted-foreground">Loading work hours...</p>
         </div>
       </div>
+    );
+  }
+
+  if (branches.length === 0) {
+    return (
+      <>
+        <AppNavbar />
+        <div className="flex">
+          <AppSidebarNav />
+          <main className="md:ml-64 flex-1 container mx-auto px-4 py-8">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold">Work Hours</h1>
+              <p className="text-muted-foreground">
+                Set your weekly working schedule
+              </p>
+            </div>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground">
+                  You need to create at least one branch before setting work
+                  hours. Please go to{" "}
+                  <a
+                    href="/barber/branches"
+                    className="text-primary hover:underline"
+                  >
+                    Branches
+                  </a>{" "}
+                  to create one.
+                </p>
+              </CardContent>
+            </Card>
+          </main>
+        </div>
+      </>
     );
   }
 
@@ -146,6 +228,24 @@ export default function WorkHoursPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSaveWorkHours} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="branch-select">Branch</Label>
+                    <select
+                      id="branch-select"
+                      value={selectedBranchId}
+                      onChange={(e) => setSelectedBranchId(e.target.value)}
+                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
+                      required
+                    >
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                          {branch.city ? ` - ${branch.city}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="day">Day of Week</Label>
                     <select
@@ -193,7 +293,7 @@ export default function WorkHoursPage() {
                   <Button
                     type="submit"
                     className="w-full"
-                    disabled={submitting}
+                    disabled={submitting || !selectedBranchId}
                   >
                     {submitting ? "Saving..." : "Save Hours"}
                   </Button>

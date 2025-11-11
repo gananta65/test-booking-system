@@ -11,19 +11,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const barber = await prisma.barber.findUnique({
-      where: { userId: session.user.id },
+    const { searchParams } = new URL(request.url);
+    const branchId = searchParams.get("branchId");
+
+    if (!branchId) {
+      return NextResponse.json(
+        { error: "branchId is required" },
+        { status: 400 }
+      );
+    }
+
+    const branch = await prisma.branch.findUnique({
+      where: { id: branchId },
     });
 
-    if (!barber) {
+    if (!branch || branch.userId !== session.user.id) {
       return NextResponse.json(
-        { error: "Barber profile not found" },
-        { status: 404 }
+        { error: "Branch not found or unauthorized" },
+        { status: 403 }
       );
     }
 
     const services = await prisma.service.findMany({
-      where: { barberId: barber.id },
+      where: { branchId },
       orderBy: { createdAt: "desc" },
     });
 
@@ -45,23 +55,33 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const data = serviceSchema.parse(body);
+    const { branchId, ...serviceData } = body;
 
-    const barber = await prisma.barber.findUnique({
-      where: { userId: session.user.id },
+    if (!branchId) {
+      return NextResponse.json(
+        { error: "branchId is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate service data
+    const data = serviceSchema.parse(serviceData);
+
+    const branch = await prisma.branch.findUnique({
+      where: { id: branchId },
     });
 
-    if (!barber) {
+    if (!branch || branch.userId !== session.user.id) {
       return NextResponse.json(
-        { error: "Barber profile not found" },
-        { status: 404 }
+        { error: "Branch not found or unauthorized" },
+        { status: 403 }
       );
     }
 
     const service = await prisma.service.create({
       data: {
         ...data,
-        barberId: barber.id,
+        branchId,
       },
     });
 

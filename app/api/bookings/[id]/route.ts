@@ -26,10 +26,9 @@ export async function GET(
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Check if user is authorized
     if (
       booking.userId !== session.user.id &&
-      booking.barber.userId !== session.user.id
+      booking.barber?.userId !== session.user.id
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -66,8 +65,7 @@ export async function PUT(
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Check if barber is authorized
-    if (booking.barber.userId !== session.user.id) {
+    if (!booking.barber || booking.barber.userId !== session.user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -110,10 +108,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Booking not found" }, { status: 404 });
     }
 
-    // Check if authorized
     if (
       booking.userId !== session.user.id &&
-      booking.barber.userId !== session.user.id
+      booking.barber?.userId !== session.user.id
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
