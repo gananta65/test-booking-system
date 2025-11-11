@@ -10,11 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import Link from "next/link";
+import { AppNavbar } from "@/components/app-navbar";
+import { AppSidebarNav } from "@/components/app-sidebar-nav";
 
 interface BarberProfile {
   id: string;
-  specialization: string;
+  description: string;
   photo: string;
   isActive: boolean;
 }
@@ -26,7 +27,7 @@ export default function BarberProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
-    specialization: "",
+    description: "",
     photo: "",
   });
 
@@ -49,7 +50,7 @@ export default function BarberProfilePage() {
         const data = await res.json();
         setProfile(data);
         setFormData({
-          specialization: data.specialization || "",
+          description: data.description || "",
           photo: data.photo || "",
         });
       }
@@ -92,72 +93,58 @@ export default function BarberProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link
-            href="/dashboard"
-            className="text-2xl font-bold hover:opacity-80"
-          >
-            Barber Booking
-          </Link>
-          <nav className="flex gap-4">
-            <Link
-              href="/barber/services"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Services
-            </Link>
-            <Link
-              href="/barber/work-hours"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Work Hours
-            </Link>
-          </nav>
-        </div>
-      </header>
+    <>
+      <AppNavbar />
+      <div className="flex">
+        <AppSidebarNav />
+        <main className="md:ml-64 flex-1 container mx-auto px-4 py-8">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold">Edit Profile</h1>
+            <p className="text-muted-foreground">
+              Manage your barber profile and information
+            </p>
+          </div>
 
-      <main className="container mx-auto px-4 py-8">
-        <Card className="max-w-2xl">
-          <CardHeader>
-            <CardTitle>Edit Profile</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="specialization">Specialization</Label>
-                <Textarea
-                  id="specialization"
-                  placeholder="Tell customers about your specialization..."
-                  value={formData.specialization}
-                  onChange={(e) =>
-                    setFormData({ ...formData, specialization: e.target.value })
-                  }
-                  rows={4}
-                />
-              </div>
+          <Card className="max-w-2xl">
+            <CardHeader>
+              <CardTitle>Profile Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="description">Bio</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Tell customers about yourself..."
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    rows={4}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="photo">Photo URL</Label>
-                <Input
-                  id="photo"
-                  type="url"
-                  placeholder="https://example.com/photo.jpg"
-                  value={formData.photo}
-                  onChange={(e) =>
-                    setFormData({ ...formData, photo: e.target.value })
-                  }
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="photo">Photo URL</Label>
+                  <Input
+                    id="photo"
+                    type="url"
+                    placeholder="https://example.com/photo.jpg"
+                    value={formData.photo}
+                    onChange={(e) =>
+                      setFormData({ ...formData, photo: e.target.value })
+                    }
+                  />
+                </div>
 
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving..." : "Save Profile"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Saving..." : "Save Profile"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    </>
   );
 }

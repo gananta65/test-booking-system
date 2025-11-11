@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
+import { AppNavbar } from "@/components/app-navbar";
+import { AppSidebarNav } from "@/components/app-sidebar-nav";
 
 interface WorkHour {
   id: string;
@@ -17,11 +18,6 @@ interface WorkHour {
   startTime: string;
   endTime: string;
   active: boolean;
-}
-
-interface Branch {
-  id: string;
-  name: string;
 }
 
 const DAYS = [
@@ -39,15 +35,13 @@ export default function WorkHoursPage() {
   const router = useRouter();
   const [workHours, setWorkHours] = useState<WorkHour[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedDay, setSelectedDay] = useState(1);
   const [formData, setFormData] = useState({
     startTime: "09:00",
     endTime: "17:00",
   });
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
-  const [noBranchError, setNoBranchError] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -57,37 +51,22 @@ export default function WorkHoursPage() {
 
   useEffect(() => {
     if (session?.user?.id) {
-      fetchBranches();
+      fetchWorkHours();
     }
   }, [session]);
 
-  async function fetchBranches() {
+  async function fetchWorkHours() {
     try {
-      const res = await fetch("/api/branches");
-      if (res.ok) {
-        const data = await res.json();
-        setBranches(data);
-        if (data.length === 0) {
-          setNoBranchError(true);
-        } else {
-          setSelectedBranchId(data[0].id);
-          fetchWorkHours(data[0].id);
-        }
+      setError(null);
+      const res = await fetch("/api/barber/work-hours");
+      if (!res.ok) {
+        throw new Error("Failed to fetch work hours");
       }
-    } catch (error) {
-      console.error("Failed to fetch branches:", error);
-    }
-  }
-
-  async function fetchWorkHours(branchId: string) {
-    try {
-      const res = await fetch(`/api/branches/${branchId}/work-hours`);
-      if (res.ok) {
-        const data = await res.json();
-        setWorkHours(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch work hours:", error);
+      const data = await res.json();
+      setWorkHours(data);
+    } catch (err) {
+      console.error("Failed to fetch work hours:", err);
+      setError("Failed to load work hours");
     } finally {
       setLoading(false);
     }
@@ -95,16 +74,14 @@ export default function WorkHoursPage() {
 
   async function handleSaveWorkHours(e: React.FormEvent) {
     e.preventDefault();
-
-    if (!selectedBranchId) {
-      alert("Please create a branch first");
-      router.push("/barber/branches");
-      return;
-    }
-
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/branches/${selectedBranchId}/work-hours`, {
+      if (formData.startTime >= formData.endTime) {
+        throw new Error("Start time must be before end time");
+      }
+
+      setError(null);
+      const res = await fetch("/api/barber/work-hours", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -113,15 +90,19 @@ export default function WorkHoursPage() {
         }),
       });
 
-      if (res.ok) {
-        const newWorkHour = await res.json();
-        const updated = workHours.filter((w) => w.dayOfWeek !== selectedDay);
-        setWorkHours([...updated, newWorkHour]);
-        alert("Work hours saved!");
+      if (!res.ok) {
+        throw new Error("Failed to save work hours");
       }
-    } catch (error) {
-      console.error("Failed to save work hours:", error);
-      alert("Failed to save work hours");
+
+      const newWorkHour = await res.json();
+      const updated = workHours.filter((w) => w.dayOfWeek !== selectedDay);
+      setWorkHours([...updated, newWorkHour]);
+      alert("Work hours saved successfully!");
+    } catch (err) {
+      console.error("Failed to save work hours:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to save work hours"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -130,140 +111,131 @@ export default function WorkHoursPage() {
   if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        Loading...
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading work hours...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link
-            href="/dashboard"
-            className="text-2xl font-bold hover:opacity-80"
-          >
-            Barber Booking
-          </Link>
-          <nav className="flex gap-4">
-            <Link
-              href="/barber/profile"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Profile
-            </Link>
-            <Link
-              href="/barber/services"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Services
-            </Link>
-          </nav>
-        </div>
-      </header>
+    <>
+      <AppNavbar />
+      <div className="flex">
+        <AppSidebarNav />
+        <main className="md:ml-64 flex-1 container mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold">Work Hours</h1>
+            <p className="text-muted-foreground">
+              Set your weekly working schedule
+            </p>
+          </div>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Set Work Hours</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSaveWorkHours} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="branch">Branch</Label>
-                  <select
-                    id="branch"
-                    value={selectedBranchId}
-                    onChange={(e) => setSelectedBranchId(e.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
-                  >
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              {error}
+            </div>
+          )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="day">Day</Label>
-                  <select
-                    id="day"
-                    value={selectedDay}
-                    onChange={(e) =>
-                      setSelectedDay(Number.parseInt(e.target.value))
-                    }
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
-                  >
-                    {DAYS.map((day, index) => (
-                      <option key={index} value={index}>
-                        {day}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">Start Time</Label>
-                  <Input
-                    id="startTime"
-                    type="time"
-                    value={formData.startTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startTime: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">End Time</Label>
-                  <Input
-                    id="endTime"
-                    type="time"
-                    value={formData.endTime}
-                    onChange={(e) =>
-                      setFormData({ ...formData, endTime: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <Button type="submit" className="w-full" disabled={submitting}>
-                  {submitting ? "Saving..." : "Save Hours"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Work Schedule</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {DAYS.map((day, index) => {
-                  const hours = workHours.find((w) => w.dayOfWeek === index);
-                  return (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 border border-border rounded-lg"
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Set Work Hours Form */}
+            <Card className="lg:col-span-1 h-fit">
+              <CardHeader>
+                <CardTitle>Set Hours</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSaveWorkHours} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="day">Day of Week</Label>
+                    <select
+                      id="day"
+                      value={selectedDay}
+                      onChange={(e) =>
+                        setSelectedDay(Number.parseInt(e.target.value))
+                      }
+                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
                     >
-                      <p className="font-medium w-24">{day}</p>
-                      <p className="text-muted-foreground">
-                        {hours
-                          ? `${hours.startTime} - ${hours.endTime}`
-                          : "Not set"}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    </div>
+                      {DAYS.map((day, index) => (
+                        <option key={index} value={index}>
+                          {day}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="startTime">Start Time</Label>
+                    <Input
+                      id="startTime"
+                      type="time"
+                      value={formData.startTime}
+                      onChange={(e) =>
+                        setFormData({ ...formData, startTime: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="endTime">End Time</Label>
+                    <Input
+                      id="endTime"
+                      type="time"
+                      value={formData.endTime}
+                      onChange={(e) =>
+                        setFormData({ ...formData, endTime: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={submitting}
+                  >
+                    {submitting ? "Saving..." : "Save Hours"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Work Schedule Display */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Weekly Schedule</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {DAYS.map((day, index) => {
+                    const hours = workHours.find((w) => w.dayOfWeek === index);
+                    return (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <p className="font-medium w-32">{day}</p>
+                        <p
+                          className={
+                            hours
+                              ? "text-foreground font-medium"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          {hours
+                            ? `${hours.startTime} - ${hours.endTime}`
+                            : "Not set"}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    </>
   );
 }

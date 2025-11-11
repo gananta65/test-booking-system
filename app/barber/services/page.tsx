@@ -1,141 +1,263 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import type React from "react";
+
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
-import { useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AppNavbar } from "@/components/app-navbar";
+import { AppSidebarNav } from "@/components/app-sidebar-nav";
 
-export default function DashboardPage() {
+interface Service {
+  id: string;
+  name: string;
+  duration: number;
+  price: number;
+  active: boolean;
+}
+
+export default function ServicesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    duration: 30,
+    price: 0,
+  });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated" && session?.user?.role === "STAFF") {
-      // Barbers and staff should go to setup, customers stay on dashboard
-      router.push("/barber/setup");
     }
-  }, [status, router, session?.user?.role]);
+  }, [status, router]);
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (session?.user?.id) {
+      fetchServices();
+    }
+  }, [session]);
+
+  async function fetchServices() {
+    try {
+      setError(null);
+      const res = await fetch("/api/barber/services");
+      if (!res.ok) {
+        throw new Error("Failed to fetch services");
+      }
+      const data = await res.json();
+      setServices(data);
+    } catch (err) {
+      console.error("Failed to fetch services:", err);
+      setError("Failed to load services");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAddService(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      if (!formData.name.trim()) {
+        throw new Error("Service name is required");
+      }
+      if (formData.price < 0) {
+        throw new Error("Price must be positive");
+      }
+
+      setError(null);
+      const res = await fetch("/api/barber/services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to add service");
+      }
+
+      const newService = await res.json();
+      setServices([newService, ...services]);
+      setFormData({ name: "", duration: 30, price: 0 });
+      alert("Service added successfully!");
+    } catch (err) {
+      console.error("Failed to add service:", err);
+      setError(err instanceof Error ? err.message : "Failed to add service");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDeleteService(id: string) {
+    if (!confirm("Are you sure you want to delete this service?")) return;
+
+    try {
+      const res = await fetch(`/api/barber/services/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to delete service");
+      }
+
+      setServices(services.filter((s) => s.id !== id));
+      alert("Service deleted!");
+    } catch (err) {
+      console.error("Failed to delete service:", err);
+      alert("Failed to delete service");
+    }
+  }
+
+  if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        Loading...
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading services...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Barber Booking</h1>
-          <div className="flex items-center gap-4">
-            <span className="text-muted-foreground">{session?.user?.name}</span>
-            <Button
-              variant="outline"
-              onClick={() => signOut({ redirect: true, callbackUrl: "/" })}
-            >
-              Sign Out
-            </Button>
+    <>
+      <AppNavbar />
+      <div className="flex">
+        <AppSidebarNav />
+        <main className="md:ml-64 flex-1 container mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold">Services</h1>
+            <p className="text-muted-foreground">
+              Manage your barber services and pricing
+            </p>
           </div>
-        </div>
-      </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Browse Barbers</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                Find and book appointments with your favorite barbers
-              </p>
-              <Button asChild>
-                <Link href="/barbers">Browse Barbers</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>My Bookings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
-                View and manage your upcoming appointments
-              </p>
-              <Button asChild>
-                <Link href="/bookings">View Bookings</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          {session?.user?.role === "STAFF" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Barber Profile</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Set up your barber profile and services
-                </p>
-                <Button asChild>
-                  <Link href="/barber/profile">Setup Profile</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Barber Profile</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Set up your barber profile and services
-                </p>
-                <Button asChild>
-                  <Link href="/barber/profile">Setup Profile</Link>
-                </Button>
-              </CardContent>
-            </Card>
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              {error}
+            </div>
           )}
 
-          {session?.user?.role === "STAFF" ? (
-            <Card>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Add Service Form */}
+            <Card className="lg:col-span-1 h-fit">
               <CardHeader>
-                <CardTitle>Manage Bookings</CardTitle>
+                <CardTitle>Add New Service</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  View and manage customer bookings
-                </p>
-                <Button asChild>
-                  <Link href="/barber/bookings">View Bookings</Link>
-                </Button>
+                <form onSubmit={handleAddService} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Service Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="e.g., Haircut, Beard Trim"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="duration">Duration (minutes)</Label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      min="15"
+                      step="15"
+                      value={formData.duration}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          duration: Number.parseInt(e.target.value),
+                        })
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Price ($)</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.price}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          price: Number.parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      required
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={submitting}
+                  >
+                    {submitting ? "Adding..." : "Add Service"}
+                  </Button>
+                </form>
               </CardContent>
             </Card>
-          ) : (
-            <Card>
+
+            {/* Services List */}
+            <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle>Manage Bookings</CardTitle>
+                <CardTitle>Your Services ({services.length})</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  View and manage customer bookings
-                </p>
-                <Button asChild>
-                  <Link href="/barber/bookings">View Bookings</Link>
-                </Button>
+                {services.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      No services yet. Create one to get started!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {services.map((service) => (
+                      <div
+                        key={service.id}
+                        className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium text-base">
+                            {service.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {service.duration} min • ${service.price.toFixed(2)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteService(service.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
-          )}
-        </div>
-      </main>
-    </div>
+          </div>
+        </main>
+      </div>
+    </>
   );
 }
