@@ -96,7 +96,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Barber Section — hanya muncul kalau role BARBER */}
-            {userRole === "BARBER" && (
+            {(userRole === "BARBER" || userRole === "ADMIN") && (
               <>
                 <Card className="hover:shadow-lg transition-shadow">
                   <CardHeader>

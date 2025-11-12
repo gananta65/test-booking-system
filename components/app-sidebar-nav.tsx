@@ -2,14 +2,22 @@
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { BarChart3, Calendar, Clock, Home, Scissors, User } from "lucide-react";
+import {
+  BarChart3,
+  Calendar,
+  Clock,
+  Home,
+  Scissors,
+  User,
+  UserCog,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
   label: string;
   href: string;
   icon: any;
-  requiredRole?: "BARBER" | "ADMIN" | "CUSTOMER";
+  requiredRole?: ("BARBER" | "ADMIN" | "CUSTOMER")[];
 }
 
 interface NavGroup {
@@ -36,31 +44,42 @@ const navigationItems: NavGroup[] = [
         label: "My Profile",
         href: "/barber/profile",
         icon: User,
-        requiredRole: "BARBER",
+        requiredRole: ["BARBER", "ADMIN"],
       },
       {
         label: "Services",
         href: "/barber/services",
         icon: Scissors,
-        requiredRole: "BARBER",
+        requiredRole: ["BARBER", "ADMIN"],
       },
       {
         label: "Work Hours",
         href: "/barber/work-hours",
         icon: Clock,
-        requiredRole: "BARBER",
+        requiredRole: ["BARBER", "ADMIN"],
       },
       {
         label: "Bookings",
         href: "/barber/bookings",
         icon: Calendar,
-        requiredRole: "BARBER",
+        requiredRole: ["BARBER", "ADMIN"],
       },
       {
         label: "Statistics",
         href: "/barber/stats",
         icon: BarChart3,
-        requiredRole: "BARBER",
+        requiredRole: ["BARBER", "ADMIN"],
+      },
+    ],
+  },
+  {
+    category: "Admin Tools",
+    items: [
+      {
+        label: "System Overview",
+        href: "/admin",
+        icon: UserCog,
+        requiredRole: ["ADMIN"],
       },
     ],
   },
@@ -69,18 +88,18 @@ const navigationItems: NavGroup[] = [
 export function AppSidebarNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
-
-  console.log("🔍 Session status:", status);
   console.log("🔍 Session data:", session);
   console.log("🔍 User role:", session?.user?.role);
 
-  const userRole = session?.user?.role || "CUSTOMER";
+  const userRole = Array.isArray(session?.user?.role)
+    ? session.user.role[0] // ambil role pertama saja
+    : session?.user?.role || "CUSTOMER";
 
   const filteredItems = navigationItems
     .map((group) => ({
       ...group,
       items: group.items.filter(
-        (item) => !item.requiredRole || item.requiredRole === userRole
+        (item) => !item.requiredRole || item.requiredRole.includes(userRole)
       ),
     }))
     .filter((group) => group.items.length > 0);
@@ -97,10 +116,6 @@ export function AppSidebarNav() {
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
-
-                if (item.requiredRole && item.requiredRole !== userRole) {
-                  return null;
-                }
 
                 return (
                   <Link

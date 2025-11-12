@@ -39,7 +39,7 @@ export default function BookingPage() {
       setLoading(true);
       setError("");
 
-      const res = await fetch("/api/branches?public=true");
+      const res = await fetch("/api/branches");
       if (!res.ok) {
         throw new Error("Failed to fetch branches");
       }

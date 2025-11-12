@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (barberRoutes.some((route) => pathname.startsWith(route))) {
-      if (token.role !== "BARBER") {
+      if (token.role !== "BARBER" && token.role !== "ADMIN") {
         // Customer or other roles trying to access barber routes - redirect to dashboard
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
